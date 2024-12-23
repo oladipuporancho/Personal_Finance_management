@@ -1,73 +1,73 @@
 const Transaction = require('../models/Transaction');
 const Budget = require('../models/Budget');
 
-// Add a transaction
+// Add a new transaction
 const addTransaction = async (req, res) => {
   try {
-    const { amount, category, narration, budgetId } = req.body;
+    const { title, amount, type, category, budgetId } = req.body;
 
-    if (!amount || !category || !narration) {
-      return res.status(400).json({ error: 'All fields except budgetId are required' });
+    if (!title || !amount || !type || !category || !budgetId) {
+      return res.status(400).json({ error: 'All fields are required' });
     }
 
-    // Check if the budget exists (if budgetId is provided)
-    if (budgetId) {
-      const budget = await Budget.findById(budgetId);
-      if (!budget) {
-        return res.status(404).json({ error: 'Budget not found' });
-      }
+    if (!['expense', 'income'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid transaction type' });
+    }
+
+    const userId = req.user.userId;
+
+    const budget = await Budget.findOne({ _id: budgetId, userId });
+    if (!budget) {
+      return res.status(404).json({ error: 'Budget not found' });
     }
 
     const transaction = new Transaction({
-      userId: req.user.userId, // Assuming auth middleware sets req.user
+      userId,
+      title,
       amount,
+      type,
       category,
-      narration,
-      budgetId: budgetId || null,
+      budgetId,
     });
 
     await transaction.save();
-    res.status(201).json({ message: 'Transaction added successfully', transaction });
+    res.status(201).json({ message: 'Transaction created successfully', transaction });
   } catch (error) {
     console.error(error);
-    res.status(500).json({ error: 'Failed to add transaction', details: error.message });
+    res.status(500).json({ error: 'Failed to create transaction', details: error.message });
   }
 };
 
-// Get all transactions
+// Get all transactions for a user
 const getAllTransactions = async (req, res) => {
   try {
-    const { date, category, budgetId } = req.query;
+    const userId = req.user.userId;
+    const transactions = await Transaction.find({ userId });
 
-    const filters = { userId: req.user.userId }; // Restrict to user's transactions
-    if (date) filters.date = date;
-    if (category) filters.category = category;
-    if (budgetId) filters.budgetId = budgetId;
+    if (transactions.length === 0) {
+      return res.status(404).json({ message: 'No transactions found' });
+    }
 
-    const transactions = await Transaction.find(filters).sort({ createdAt: -1 });
-    res.status(200).json({ transactions });
+    res.status(200).json(transactions);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch transactions', details: error.message });
   }
 };
 
-// Get a single transaction
+// Get a specific transaction by ID
 const getTransactionById = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.userId;
 
-    const transaction = await Transaction.findById(id);
+    const transaction = await Transaction.findOne({ _id: id, userId });
 
     if (!transaction) {
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
-    if (transaction.userId.toString() !== req.user.userId) {
-      return res.status(403).json({ error: 'Not authorized to view this transaction' });
-    }
-
-    res.status(200).json({ transaction });
+    res.status(200).json(transaction);
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: 'Failed to fetch transaction', details: error.message });
@@ -78,31 +78,23 @@ const getTransactionById = async (req, res) => {
 const updateTransaction = async (req, res) => {
   try {
     const { id } = req.params;
-    const { amount, category, narration, budgetId } = req.body;
+    const userId = req.user.userId;
+    const { title, amount, type, category, budgetId } = req.body;
 
-    const transaction = await Transaction.findById(id);
+    const transaction = await Transaction.findOne({ _id: id, userId });
 
     if (!transaction) {
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
-    if (transaction.userId.toString() !== req.user.userId) {
-      return res.status(403).json({ error: 'Not authorized to update this transaction' });
-    }
-
-    // Update transaction fields
-    if (amount) transaction.amount = amount;
-    if (category) transaction.category = category;
-    if (narration) transaction.narration = narration;
-    if (budgetId) {
-      const budget = await Budget.findById(budgetId);
-      if (!budget) {
-        return res.status(404).json({ error: 'Budget not found' });
-      }
-      transaction.budgetId = budgetId;
-    }
+    transaction.title = title || transaction.title;
+    transaction.amount = amount || transaction.amount;
+    transaction.type = type || transaction.type;
+    transaction.category = category || transaction.category;
+    transaction.budgetId = budgetId || transaction.budgetId;
 
     await transaction.save();
+
     res.status(200).json({ message: 'Transaction updated successfully', transaction });
   } catch (error) {
     console.error(error);
@@ -114,18 +106,16 @@ const updateTransaction = async (req, res) => {
 const deleteTransaction = async (req, res) => {
   try {
     const { id } = req.params;
+    const userId = req.user.userId;
 
-    const transaction = await Transaction.findById(id);
+    const transaction = await Transaction.findOne({ _id: id, userId });
 
     if (!transaction) {
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
-    if (transaction.userId.toString() !== req.user.userId) {
-      return res.status(403).json({ error: 'Not authorized to delete this transaction' });
-    }
+    await Transaction.findByIdAndDelete(id);
 
-    await transaction.deleteOne();
     res.status(200).json({ message: 'Transaction deleted successfully' });
   } catch (error) {
     console.error(error);

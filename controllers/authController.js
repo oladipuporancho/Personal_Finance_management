@@ -2,12 +2,10 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// Function to handle user registration
 const register = async (req, res) => {
   try {
     const { username, email, password } = req.body;
 
-    // Ensure all fields are provided
     if (!username || !email || !password) {
       return res.status(400).json({ error: 'All fields are required' });
     }
@@ -25,7 +23,7 @@ const register = async (req, res) => {
     });
 
     await newUser.save();
-    // Exclude password from the response to improve security
+
     newUser.password = undefined;
     res.status(201).json({ message: 'User created successfully', user: newUser });
   } catch (error) {

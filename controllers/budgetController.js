@@ -1,4 +1,4 @@
-const Budget = require('../models/Budget'); // Import the Budget model
+const Budget = require('../models/Budget'); 
 
 // Create a new budget
 const createBudget = async (req, res) => {

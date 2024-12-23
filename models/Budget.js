@@ -1,4 +1,3 @@
-// models/Budget.js
 const mongoose = require('mongoose');
 
 const budgetSchema = new mongoose.Schema({
@@ -16,7 +15,7 @@ const budgetSchema = new mongoose.Schema({
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',  
+    ref: 'User',
     required: true,
   }
 });
