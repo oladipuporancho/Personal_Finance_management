@@ -1,13 +1,20 @@
 const express = require('express');
-const { register, login, updateProfile, updatePassword } = require('../controllers/authController');
+const {
+  register,
+  login,
+  updateProfile,
+  updatePassword,
+} = require('../controllers/authController');
 const authenticateToken = require('../middleware/authMiddleware');
 
 const router = express.Router();
 
-router.post('/register', register); // Register user
-router.post('/login', login); // Login user
+// Public routes
+router.post('/register', register);
+router.post('/login', login);
 
-router.put('/profile', authenticateToken, updateProfile); // Update profile
-router.put('/profile/password', authenticateToken, updatePassword); // Update password
+// Protected routes
+router.put('/profile', authenticateToken, updateProfile);
+router.put('/profile/password', authenticateToken, updatePassword);
 
 module.exports = router;
