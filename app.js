@@ -5,18 +5,20 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const budgetRoutes = require('./routes/budgetRoutes');
-const insightRoutes = require('./routes/insightRoutes'); // Make sure this is added
+const insightRoutes = require('./routes/insightRoutes'); // Ensure this route is added
 
 dotenv.config();
 
 const app = express();
 
+// Middleware setup
 app.use(cors());
 app.use(express.json());
 
 // Connect to MongoDB
 connectDB();
 
+// Routes setup
 app.use('/api', authRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/budgets', budgetRoutes);
