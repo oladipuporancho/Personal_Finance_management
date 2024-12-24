@@ -5,7 +5,7 @@ const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const transactionRoutes = require('./routes/transactionRoutes');
 const budgetRoutes = require('./routes/budgetRoutes');
-const insightRoutes = require('./routes/insightRoutes'); // Ensure this route is added
+const insightRoutes = require('./routes/insightRoutes');
 
 dotenv.config();
 
