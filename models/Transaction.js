@@ -6,7 +6,7 @@ const transactionSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
-  title: {
+  narration: {
     type: String,
     required: true,
   },
@@ -16,8 +16,8 @@ const transactionSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    required: true,
-    enum: ['expense', 'income'], 
+    enum: ['expense', 'income'], // Ensures it is either 'expense' or 'income' if provided
+    default: 'expense', // Default value
   },
   category: {
     type: String,
@@ -26,7 +26,10 @@ const transactionSchema = new mongoose.Schema({
   budgetId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Budget',
-    required: true,
+  },
+  time: { // Added time field with default value
+    type: Date,
+    default: Date.now,
   },
 });
 

@@ -4,16 +4,11 @@ const Budget = require('../models/Budget');
 // Add a new transaction
 const addTransaction = async (req, res) => {
   try {
-    const { title, amount, type, category, budgetId } = req.body;
+    const { narration, amount, type, category, budgetId, time } = req.body;
 
     // Validate required fields
-    if (!title || !amount || !type || !category || !budgetId) {
-      return res.status(400).json({ error: 'All fields are required' });
-    }
-
-    // Validate transaction type
-    if (!['expense', 'income'].includes(type)) {
-      return res.status(400).json({ error: 'Invalid transaction type. Must be "expense" or "income".' });
+    if (!narration || !amount || !category) {
+      return res.status(400).json({ error: 'Narration, amount, and category are required' });
     }
 
     const userId = req.user?.userId;
@@ -23,20 +18,28 @@ const addTransaction = async (req, res) => {
       return res.status(401).json({ error: 'Unauthorized. User ID is missing.' });
     }
 
-    // Verify the budget exists and belongs to the user
-    const budget = await Budget.findOne({ _id: budgetId, userId });
-    if (!budget) {
-      return res.status(404).json({ error: 'Budget not found or does not belong to the user.' });
+    // Validate transaction type if provided
+    if (type && !['expense', 'income'].includes(type)) {
+      return res.status(400).json({ error: 'Invalid transaction type. Must be "expense" or "income".' });
+    }
+
+    // Verify the budget exists if budgetId is provided
+    if (budgetId) {
+      const budget = await Budget.findOne({ _id: budgetId, userId });
+      if (!budget) {
+        return res.status(404).json({ error: 'Budget not found or does not belong to the user.' });
+      }
     }
 
     // Create the transaction
     const transaction = new Transaction({
       userId,
-      title,
+      narration,
       amount,
-      type,
+      type: type || 'expense', // Default to 'expense' if not provided
       category,
-      budgetId,
+      budgetId: budgetId || null, // Default to null if not provided
+      time: time || new Date(), // Default to current time if not provided
     });
 
     await transaction.save();
@@ -96,7 +99,7 @@ const updateTransaction = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
-    const { title, amount, type, category, budgetId } = req.body;
+    const { narration, amount, type, category, budgetId, time } = req.body;
 
     // Ensure userId is available
     if (!userId) {
@@ -123,11 +126,12 @@ const updateTransaction = async (req, res) => {
     }
 
     // Update only the fields provided in the request
-    transaction.title = title || transaction.title;
+    transaction.narration = narration || transaction.narration;
     transaction.amount = amount || transaction.amount;
     transaction.type = type || transaction.type;
     transaction.category = category || transaction.category;
     transaction.budgetId = budgetId || transaction.budgetId;
+    transaction.time = time || transaction.time;
 
     await transaction.save();
 
