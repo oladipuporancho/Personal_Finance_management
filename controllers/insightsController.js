@@ -23,7 +23,6 @@ const getFinancialSummary = async (req, res) => {
     const budget = await Budget.findOne({ userId });
     const remainingBudget = budget ? budget.amount - (totalExpenses[0]?.totalExpenses || 0) : 0;
 
-
     // Get top categories of expenses
     const topCategories = await Transaction.aggregate([
       { $match: { userId, type: 'expense' } },
@@ -50,26 +49,22 @@ const getFinancialSummary = async (req, res) => {
 // Monthly Breakdown
 const getMonthlyBreakdown = async (req, res) => {
   try {
-    // Ensure `userId` is properly converted to an ObjectId
     const userId = new mongoose.Types.ObjectId(req.user.userId);
 
-    // Group income and expenses by month
     const monthlyTrends = await Transaction.aggregate([
-    { $match: { userId: new mongoose.Types.ObjectId(req.user.userId) } },
-    {
-      $group: {
-        _id: { month: { $month: "$date" }, year: { $year: "$date" }, type: "$type" },
-        totalAmount: { $sum: "$amount" },
+      { $match: { userId } },
+      {
+        $group: {
+          _id: { month: { $month: "$date" }, year: { $year: "$date" }, type: "$type" },
+          totalAmount: { $sum: "$amount" },
+        },
       },
-    },
-    { $sort: { "_id.year": -1, "_id.month": -1 } },
-  ]);
+      { $sort: { "_id.year": -1, "_id.month": -1 } },
+    ]);
 
-    // Filter income and expenses
     const incomeByMonth = monthlyTrends.filter((trend) => trend._id.type === 'income');
     const expensesByMonth = monthlyTrends.filter((trend) => trend._id.type === 'expense');
 
-    // Send the response
     res.status(200).json({
       incomeByMonth,
       expensesByMonth,
@@ -80,12 +75,49 @@ const getMonthlyBreakdown = async (req, res) => {
   }
 };
 
+// Weekly Breakdown
+const getWeeklyBreakdown = async (req, res) => {
+  try {
+    const userId = new mongoose.Types.ObjectId(req.user.userId);
+
+    // Group transactions by week of the year (week number)
+    const weeklyTrends = await Transaction.aggregate([
+      { $match: { userId } },
+      {
+        $project: {
+          week: { $isoWeek: "$date" },  // Get ISO week number
+          year: { $year: "$date" },
+          type: 1,
+          amount: 1,
+        },
+      },
+      {
+        $group: {
+          _id: { week: "$week", year: "$year", type: "$type" },
+          totalAmount: { $sum: "$amount" },
+        },
+      },
+      { $sort: { "_id.year": -1, "_id.week": -1 } }, // Sort by year and week number
+    ]);
+
+    const incomeByWeek = weeklyTrends.filter((trend) => trend._id.type === 'income');
+    const expensesByWeek = weeklyTrends.filter((trend) => trend._id.type === 'expense');
+
+    res.status(200).json({
+      incomeByWeek,
+      expensesByWeek,
+    });
+  } catch (error) {
+    console.error('Error in getWeeklyBreakdown:', error.message);
+    res.status(500).json({ error: 'Failed to generate weekly breakdown', details: error.message });
+  }
+};
+
 // Trend Analysis
 const getTrendAnalysis = async (req, res) => {
   try {
     const userId = mongoose.Types.ObjectId(req.user.userId);
 
-    // Income trends over time
     const incomeTrends = await Transaction.aggregate([
       { $match: { userId, type: 'income' } },
       { $project: { month: { $month: '$date' }, year: { $year: '$date' }, amount: 1 } },
@@ -93,7 +125,6 @@ const getTrendAnalysis = async (req, res) => {
       { $sort: { '_id.year': -1, '_id.month': -1 } },
     ]);
 
-    // Expense trends over time
     const expenseTrends = await Transaction.aggregate([
       { $match: { userId, type: 'expense' } },
       { $project: { month: { $month: '$date' }, year: { $year: '$date' }, amount: 1 } },
@@ -115,4 +146,5 @@ module.exports = {
   getFinancialSummary,
   getMonthlyBreakdown,
   getTrendAnalysis,
+  getWeeklyBreakdown, // Exporting the new function
 };
