@@ -1,6 +1,11 @@
 const Transaction = require('../models/Transaction');
 const Budget = require('../models/Budget');
 
+// Helper function to find a transaction
+const findTransaction = async (id, userId) => {
+  return Transaction.findOne({ _id: id, userId });
+};
+
 // Add a new transaction
 const addTransaction = async (req, res) => {
   try {
@@ -8,19 +13,24 @@ const addTransaction = async (req, res) => {
 
     // Validate required fields
     if (!narration || !amount || !category) {
-      return res.status(400).json({ error: 'Narration, amount, and category are required' });
+      return res.status(400).json({ error: 'Narration, amount, and category are required.' });
+    }
+
+    if (typeof amount !== "number" || amount <= 0) {
+      return res.status(400).json({ error: 'Amount must be a positive number.' });
     }
 
     const userId = req.user?.userId;
-
-    // Ensure userId is available
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized. User ID is missing.' });
     }
 
-    // Validate transaction type if provided
     if (type && !['expense', 'income'].includes(type)) {
       return res.status(400).json({ error: 'Invalid transaction type. Must be "expense" or "income".' });
+    }
+
+    if (time && isNaN(Date.parse(time))) {
+      return res.status(400).json({ error: 'Invalid time format. Must be a valid date.' });
     }
 
     // Verify the budget exists if budgetId is provided
@@ -36,17 +46,17 @@ const addTransaction = async (req, res) => {
       userId,
       narration,
       amount,
-      type: type || 'expense', // Default to 'expense' if not provided
+      type: type || 'expense',
       category,
-      budgetId: budgetId || null, // Default to null if not provided
-      time: time || new Date(), // Default to current time if not provided
+      budgetId: budgetId || null,
+      time: time || new Date(),
     });
 
     await transaction.save();
 
     res.status(201).json({ message: 'Transaction created successfully', transaction });
   } catch (error) {
-    console.error('Error in addTransaction:', error);
+    console.error('Error in addTransaction:', error.stack);
     res.status(500).json({ error: 'Failed to create transaction', details: error.message });
   }
 };
@@ -55,41 +65,36 @@ const addTransaction = async (req, res) => {
 const getAllTransactions = async (req, res) => {
   try {
     const userId = req.user?.userId;
-
-    // Ensure userId is available
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized. User ID is missing.' });
     }
 
     const transactions = await Transaction.find({ userId });
-
     res.status(200).json({ transactions });
   } catch (error) {
-    console.error('Error in getAllTransactions:', error);
+    console.error('Error in getAllTransactions:', error.stack);
     res.status(500).json({ error: 'Failed to fetch transactions', details: error.message });
   }
 };
 
-// Get a specific transaction by ID
+// Get a transaction by its ID
 const getTransactionById = async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user?.userId;
 
-    // Ensure userId is available
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized. User ID is missing.' });
     }
 
-    const transaction = await Transaction.findOne({ _id: id, userId });
-
+    const transaction = await findTransaction(id, userId);
     if (!transaction) {
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
-    res.status(200).json(transaction);
+    res.status(200).json({ transaction });
   } catch (error) {
-    console.error('Error in getTransactionById:', error);
+    console.error('Error in getTransactionById:', error.stack);
     res.status(500).json({ error: 'Failed to fetch transaction', details: error.message });
   }
 };
@@ -101,23 +106,19 @@ const updateTransaction = async (req, res) => {
     const userId = req.user?.userId;
     const { narration, amount, type, category, budgetId, time } = req.body;
 
-    // Ensure userId is available
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized. User ID is missing.' });
     }
 
-    // Find the transaction and validate its existence
-    const transaction = await Transaction.findOne({ _id: id, userId });
+    const transaction = await findTransaction(id, userId);
     if (!transaction) {
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
-    // Validate transaction type if provided
     if (type && !['expense', 'income'].includes(type)) {
       return res.status(400).json({ error: 'Invalid transaction type. Must be "expense" or "income".' });
     }
 
-    // Verify the budget exists if budgetId is updated
     if (budgetId) {
       const budget = await Budget.findOne({ _id: budgetId, userId });
       if (!budget) {
@@ -125,19 +126,18 @@ const updateTransaction = async (req, res) => {
       }
     }
 
-    // Update only the fields provided in the request
-    transaction.narration = narration || transaction.narration;
-    transaction.amount = amount || transaction.amount;
-    transaction.type = type || transaction.type;
-    transaction.category = category || transaction.category;
-    transaction.budgetId = budgetId || transaction.budgetId;
-    transaction.time = time || transaction.time;
+    if (narration !== undefined) transaction.narration = narration;
+    if (amount !== undefined) transaction.amount = amount;
+    if (type !== undefined) transaction.type = type;
+    if (category !== undefined) transaction.category = category;
+    if (budgetId !== undefined) transaction.budgetId = budgetId;
+    if (time !== undefined) transaction.time = time;
 
     await transaction.save();
 
     res.status(200).json({ message: 'Transaction updated successfully', transaction });
   } catch (error) {
-    console.error('Error in updateTransaction:', error);
+    console.error('Error in updateTransaction:', error.stack);
     res.status(500).json({ error: 'Failed to update transaction', details: error.message });
   }
 };
@@ -148,29 +148,26 @@ const deleteTransaction = async (req, res) => {
     const { id } = req.params;
     const userId = req.user?.userId;
 
-    // Ensure userId is available
     if (!userId) {
       return res.status(401).json({ error: 'Unauthorized. User ID is missing.' });
     }
 
-    // Find the transaction and validate its existence
-    const transaction = await Transaction.findOne({ _id: id, userId });
+    const transaction = await findTransaction(id, userId);
     if (!transaction) {
       return res.status(404).json({ error: 'Transaction not found' });
     }
 
     await transaction.deleteOne();
-
     res.status(200).json({ message: 'Transaction deleted successfully' });
   } catch (error) {
-    console.error('Error in deleteTransaction:', error);
+    console.error('Error in deleteTransaction:', error.stack);
     res.status(500).json({ error: 'Failed to delete transaction', details: error.message });
   }
 };
 
 module.exports = {
   addTransaction,
-  getAllTransactions,
+  getAllTransactions,  // Added this function here
   getTransactionById,
   updateTransaction,
   deleteTransaction,

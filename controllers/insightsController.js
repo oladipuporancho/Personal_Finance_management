@@ -1,10 +1,11 @@
+const mongoose = require('mongoose');
 const Transaction = require('../models/Transaction');
 const Budget = require('../models/Budget');
 
 // Financial Summary
 const getFinancialSummary = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = new mongoose.Types.ObjectId(req.user.userId);
 
     // Calculate total income
     const totalIncome = await Transaction.aggregate([
@@ -20,7 +21,8 @@ const getFinancialSummary = async (req, res) => {
 
     // Get budget details
     const budget = await Budget.findOne({ userId });
-    const remainingBudget = budget ? budget.amount - totalExpenses[0]?.totalExpenses : 0;
+    const remainingBudget = budget ? budget.amount - (totalExpenses[0]?.totalExpenses || 0) : 0;
+
 
     // Get top categories of expenses
     const topCategories = await Transaction.aggregate([
@@ -34,10 +36,13 @@ const getFinancialSummary = async (req, res) => {
       totalIncome: totalIncome[0]?.totalIncome || 0,
       totalExpenses: totalExpenses[0]?.totalExpenses || 0,
       remainingBudget,
-      topCategories,
+      topCategories: topCategories.map((category) => ({
+        category: category._id,
+        total: category.total,
+      })),
     });
   } catch (error) {
-    console.error(error);
+    console.error('Error in getFinancialSummary:', error.message);
     res.status(500).json({ error: 'Failed to generate financial summary', details: error.message });
   }
 };
@@ -45,30 +50,32 @@ const getFinancialSummary = async (req, res) => {
 // Monthly Breakdown
 const getMonthlyBreakdown = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    // Ensure `userId` is properly converted to an ObjectId
+    const userId = new mongoose.Types.ObjectId(req.user.userId);
 
-    // Group income by month
-    const incomeByMonth = await Transaction.aggregate([
-      { $match: { userId, type: 'income' } },
-      { $project: { month: { $month: "$date" }, year: { $year: "$date" }, amount: 1 } },
-      { $group: { _id: { month: "$month", year: "$year" }, totalIncome: { $sum: "$amount" } } },
-      { $sort: { "_id.year": -1, "_id.month": -1 } },
-    ]);
+    // Group income and expenses by month
+    const monthlyTrends = await Transaction.aggregate([
+    { $match: { userId: new mongoose.Types.ObjectId(req.user.userId) } },
+    {
+      $group: {
+        _id: { month: { $month: "$date" }, year: { $year: "$date" }, type: "$type" },
+        totalAmount: { $sum: "$amount" },
+      },
+    },
+    { $sort: { "_id.year": -1, "_id.month": -1 } },
+  ]);
 
-    // Group expenses by month
-    const expensesByMonth = await Transaction.aggregate([
-      { $match: { userId, type: 'expense' } },
-      { $project: { month: { $month: "$date" }, year: { $year: "$date" }, amount: 1 } },
-      { $group: { _id: { month: "$month", year: "$year" }, totalExpense: { $sum: "$amount" } } },
-      { $sort: { "_id.year": -1, "_id.month": -1 } },
-    ]);
+    // Filter income and expenses
+    const incomeByMonth = monthlyTrends.filter((trend) => trend._id.type === 'income');
+    const expensesByMonth = monthlyTrends.filter((trend) => trend._id.type === 'expense');
 
+    // Send the response
     res.status(200).json({
       incomeByMonth,
-      expensesByMonth
+      expensesByMonth,
     });
   } catch (error) {
-    console.error(error);
+    console.error('Error in getMonthlyBreakdown:', error.message);
     res.status(500).json({ error: 'Failed to generate monthly breakdown', details: error.message });
   }
 };
@@ -76,30 +83,30 @@ const getMonthlyBreakdown = async (req, res) => {
 // Trend Analysis
 const getTrendAnalysis = async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = mongoose.Types.ObjectId(req.user.userId);
 
     // Income trends over time
     const incomeTrends = await Transaction.aggregate([
       { $match: { userId, type: 'income' } },
-      { $project: { month: { $month: "$date" }, year: { $year: "$date" }, amount: 1 } },
-      { $group: { _id: { month: "$month", year: "$year" }, totalIncome: { $sum: "$amount" } } },
-      { $sort: { "_id.year": -1, "_id.month": -1 } },
+      { $project: { month: { $month: '$date' }, year: { $year: '$date' }, amount: 1 } },
+      { $group: { _id: { month: '$month', year: '$year' }, totalIncome: { $sum: '$amount' } } },
+      { $sort: { '_id.year': -1, '_id.month': -1 } },
     ]);
 
     // Expense trends over time
     const expenseTrends = await Transaction.aggregate([
       { $match: { userId, type: 'expense' } },
-      { $project: { month: { $month: "$date" }, year: { $year: "$date" }, amount: 1 } },
-      { $group: { _id: { month: "$month", year: "$year" }, totalExpense: { $sum: "$amount" } } },
-      { $sort: { "_id.year": -1, "_id.month": -1 } },
+      { $project: { month: { $month: '$date' }, year: { $year: '$date' }, amount: 1 } },
+      { $group: { _id: { month: '$month', year: '$year' }, totalExpense: { $sum: '$amount' } } },
+      { $sort: { '_id.year': -1, '_id.month': -1 } },
     ]);
 
     res.status(200).json({
       incomeTrends,
-      expenseTrends
+      expenseTrends,
     });
   } catch (error) {
-    console.error(error);
+    console.error('Error in getTrendAnalysis:', error.message);
     res.status(500).json({ error: 'Failed to analyze trends', details: error.message });
   }
 };
@@ -107,5 +114,5 @@ const getTrendAnalysis = async (req, res) => {
 module.exports = {
   getFinancialSummary,
   getMonthlyBreakdown,
-  getTrendAnalysis
+  getTrendAnalysis,
 };
