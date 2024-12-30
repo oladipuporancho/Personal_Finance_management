@@ -21,7 +21,11 @@ const getFinancialSummary = async (req, res) => {
 
     // Get budget details
     const budget = await Budget.findOne({ userId });
-    const remainingBudget = budget ? budget.amount - (totalExpenses[0]?.totalExpenses || 0) : 0;
+
+    // Calculate remaining budget with checks
+    const remainingBudget = budget && budget.amount != null
+                            ? budget.amount - (totalExpenses[0]?.totalExpenses || 0)
+                            : 0;
 
     // Get top categories of expenses
     const topCategories = await Transaction.aggregate([
@@ -80,7 +84,6 @@ const getWeeklyBreakdown = async (req, res) => {
   try {
     const userId = new mongoose.Types.ObjectId(req.user.userId);
 
-    // Group transactions by week of the year (week number)
     const weeklyTrends = await Transaction.aggregate([
       { $match: { userId } },
       {

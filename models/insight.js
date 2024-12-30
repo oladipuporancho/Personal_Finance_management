@@ -1,4 +1,3 @@
-
 const mongoose = require('mongoose');
 
 const insightSchema = new mongoose.Schema({
@@ -28,6 +27,13 @@ const insightSchema = new mongoose.Schema({
   trendAnalysis: [
     {
       month: { type: String, required: true },
+      income: { type: Number, required: true },
+      expense: { type: Number, required: true },
+    },
+  ],
+  weeklyBreakdown: [
+    {
+      week: { type: String, required: true },
       income: { type: Number, required: true },
       expense: { type: Number, required: true },
     },
