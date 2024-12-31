@@ -7,11 +7,21 @@ const getFinancialSummary = async (req, res) => {
   try {
     const userId = new mongoose.Types.ObjectId(req.user.userId);
 
+    // Debug: Log the user ID
+    console.log('User ID:', userId);
+
+    // Fetch income transactions
+    const incomeTransactions = await Transaction.find({ userId, type: 'income' });
+    console.log('Income Transactions:', incomeTransactions);
+
     // Calculate total income
     const totalIncome = await Transaction.aggregate([
       { $match: { userId, type: 'income' } },
       { $group: { _id: null, totalIncome: { $sum: '$amount' } } },
     ]);
+
+    // Debug: Log total income
+    console.log('Total Income (Aggregation):', totalIncome);
 
     // Calculate total expenses
     const totalExpenses = await Transaction.aggregate([
@@ -19,13 +29,20 @@ const getFinancialSummary = async (req, res) => {
       { $group: { _id: null, totalExpenses: { $sum: '$amount' } } },
     ]);
 
-    // Get budget details
-    const budget = await Budget.findOne({ userId });
+    // Debug: Log total expenses
+    console.log('Total Expenses:', totalExpenses);
 
-    // Calculate remaining budget with checks
+    // Fetch budget
+    const budget = await Budget.findOne({ userId });
+    console.log('Budget Document:', budget);
+
+    // Calculate remaining budget
     const remainingBudget = budget && budget.amount != null
-                            ? budget.amount - (totalExpenses[0]?.totalExpenses || 0)
-                            : 0;
+      ? budget.amount - (totalExpenses[0]?.totalExpenses || 0)
+      : 0;
+
+    // Debug: Log remaining budget
+    console.log('Remaining Budget:', remainingBudget);
 
     // Get top categories of expenses
     const topCategories = await Transaction.aggregate([
@@ -34,6 +51,9 @@ const getFinancialSummary = async (req, res) => {
       { $sort: { total: -1 } },
       { $limit: 5 },
     ]);
+
+    // Debug: Log top categories
+    console.log('Top Categories:', topCategories);
 
     res.status(200).json({
       totalIncome: totalIncome[0]?.totalIncome || 0,
@@ -49,6 +69,7 @@ const getFinancialSummary = async (req, res) => {
     res.status(500).json({ error: 'Failed to generate financial summary', details: error.message });
   }
 };
+
 
 // Monthly Breakdown
 const getMonthlyBreakdown = async (req, res) => {
